@@ -6,18 +6,23 @@ gsap.registerPlugin(ScrollTrigger);
 
 export { gsap, ScrollTrigger };
 
-export function createLenis(): Lenis {
+export function createLenis(): { lenis: Lenis; destroy: () => void } {
   const lenis = new Lenis({
     autoRaf: false,
     smoothWheel: true,
   });
 
-  lenis.on("scroll", ScrollTrigger.update);
+  const raf = (time: number) => lenis.raf(time * 1000);
 
-  gsap.ticker.add((time) => {
-    lenis.raf(time * 1000);
-  });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add(raf);
   gsap.ticker.lagSmoothing(0);
 
-  return lenis;
+  return {
+    lenis,
+    destroy: () => {
+      gsap.ticker.remove(raf);
+      lenis.destroy();
+    },
+  };
 }
