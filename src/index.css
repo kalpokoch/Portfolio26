@@ -1,18 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0b1120;
-  --color-signal: #3fd0c9;
-  --color-amber: #f2a65a;
-  --color-text: #e8ecef;
-  --color-text-muted: #8a96a8;
+  --color-bg: #0a0d0b;
+  --color-signal: #8fbfa3;
+  --color-signal-bright: #b6dcc4;
+  --color-muted: #5b6660;
+  --color-text: #edeae2;
+  --color-text-dim: #9aa39c;
 
-  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
-  --font-sans: "Manrope", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+
+  --ease-signal: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
   color-scheme: dark;
+}
+
+body {
+  position: relative;
+  overflow-x: hidden;
 }
 
 * {
@@ -29,13 +38,26 @@ body {
   overscroll-behavior: none;
 }
 
+/* A single soft light source, not busy graphics — the only background depth cue. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 65% 50% at 50% 6%,
+    rgba(143, 191, 163, 0.09),
+    transparent 62%
+  );
+}
+
 #root {
   min-height: 100svh;
 }
 
 ::selection {
-  background: var(--color-signal);
-  color: var(--color-bg);
+  background: rgba(143, 191, 163, 0.3);
+  color: var(--color-text);
 }
 
 :focus-visible {
@@ -46,7 +68,99 @@ body {
 h1,
 h2,
 h3 {
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-weight: 700;
   margin: 0;
+}
+
+/* ---------- Editorial type scale — used identically across every chapter ---------- */
+
+.type-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(3rem, 9vw, 7.5rem);
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.type-headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.type-statement {
+  font-family: var(--font-sans);
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  line-height: 1.65;
+  color: var(--color-text-dim);
+  margin: 0;
+}
+
+.type-meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--color-text-dim);
+  margin: 0;
+}
+
+.type-stat-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.6rem, 3.2vw, 2.6rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.type-stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-top: 0.35rem;
+}
+
+.hairline {
+  border: none;
+  border-top: 1px solid rgba(237, 234, 226, 0.12);
+  margin: 0;
+}
+
+.divider {
+  color: var(--color-signal);
+  opacity: 0.6;
+  margin: 0 0.6em;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mount-reveal {
+  animation: rise-in 0.9s var(--ease-signal) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mount-reveal {
+    animation: none;
+  }
 }

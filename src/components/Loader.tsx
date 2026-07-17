@@ -4,6 +4,7 @@ interface LoaderProps {
   onDone: () => void;
 }
 
+/** An ECG-style sweep — ties the preload moment to the Bio-Signal identity instead of a generic spinner. */
 export default function Loader({ onDone }: LoaderProps) {
   const [visible, setVisible] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -14,47 +15,60 @@ export default function Loader({ onDone }: LoaderProps) {
     if (!canvas || !ctx) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const size = 160;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
+    const width = 280;
+    const height = 80;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
-
-    const count = 80;
-    const particles = Array.from({ length: count }, () => ({
-      angle: Math.random() * Math.PI * 2,
-      radius: 40 + Math.random() * 40,
-      speed: 0.3 + Math.random() * 0.5,
-    }));
 
     let raf = 0;
     let t = 0;
     const draw = () => {
-      t += 0.02;
-      ctx.clearRect(0, 0, size, size);
-      const assemble = Math.min(1, t / 1.4);
-      particles.forEach((p) => {
-        const r = p.radius * (1 - assemble * 0.85);
-        const a = p.angle + t * p.speed;
-        const x = size / 2 + Math.cos(a) * r;
-        const y = size / 2 + Math.sin(a) * r;
-        ctx.beginPath();
-        ctx.arc(x, y, 1.6, 0, Math.PI * 2);
-        ctx.fillStyle = "#3FD0C9";
-        ctx.globalAlpha = 0.5 + assemble * 0.5;
-        ctx.fill();
-      });
+      t += 3;
+      ctx.clearRect(0, 0, width, height);
+      ctx.strokeStyle = "#8FBFA3";
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "rgba(143,191,163,0.6)";
+      ctx.beginPath();
+      const spikeStart = width * 0.55;
+      for (let x = 0; x <= width; x++) {
+        const phase = (x + t) % width;
+        let y = height / 2;
+        if (phase > spikeStart && phase < spikeStart + 26) {
+          const local = phase - spikeStart;
+          if (local < 6) y -= local * 3;
+          else if (local < 14) y += (local - 6) * 7.5 - 18;
+          else if (local < 20) y -= (local - 14) * 8 - 42;
+          else y += (local - 20) * 3.5 - 6;
+        } else {
+          y += Math.sin(phase * 0.06) * 1.5;
+        }
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
 
-    const timer = setTimeout(() => {
+    const minDuration = new Promise((resolve) => setTimeout(resolve, 900));
+    const fontsReady = document.fonts?.ready ?? Promise.resolve();
+    const safetyTimeout = new Promise((resolve) => setTimeout(resolve, 4000));
+
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
       setVisible(false);
       setTimeout(onDone, 500);
-    }, 1300);
+    };
+    Promise.race([Promise.all([minDuration, fontsReady]), safetyTimeout]).then(dismiss);
 
     return () => {
       cancelAnimationFrame(raf);
-      clearTimeout(timer);
+      dismissed = true;
     };
   }, [onDone]);
 
@@ -62,12 +76,12 @@ export default function Loader({ onDone }: LoaderProps) {
     <div
       role="status"
       aria-label="Loading"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0B1120] transition-opacity duration-500"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0A0D0B]/95 backdrop-blur-sm transition-opacity duration-500"
       style={{ opacity: visible ? 1 : 0, pointerEvents: visible ? "auto" : "none" }}
     >
-      <canvas ref={canvasRef} className="h-40 w-40" />
-      <p className="mt-4 font-mono text-xs uppercase tracking-[0.3em] text-[#8A96A8]">
-        Signal Flow
+      <canvas ref={canvasRef} className="h-20 w-[280px]" />
+      <p className="mt-6 font-mono text-[0.65rem] uppercase tracking-[0.4em] text-[#5B6660]">
+        Loading
       </p>
     </div>
   );

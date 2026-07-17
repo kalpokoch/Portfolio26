@@ -1,23 +1,21 @@
 import { useState } from "react";
-import { ScrollProvider, useScrollContext } from "./lib/scroll-context";
-import { useIsMobile } from "./lib/use-is-mobile";
-import { ParticleField } from "./three/ParticleField";
-import SceneTrack from "./components/SceneTrack";
-import FallbackLayout from "./components/FallbackLayout";
-import SideNav from "./components/Nav/SideNav";
-import KeyboardNav from "./components/Nav/KeyboardNav";
+import { ScrollTimelineProvider } from "./components/ScrollTimelineProvider";
+import SceneStage from "./components/SceneStage";
+import ChapterTracker from "./components/ChapterTracker";
+import KeyboardNav from "./components/KeyboardNav";
+import FallbackStack from "./components/FallbackStack";
 import Loader from "./components/Loader";
+import { useIsImmersive } from "./lib/use-immersive";
 
 function Experience() {
-  const { reducedMotion } = useScrollContext();
-  const isMobile = useIsMobile();
-  const immersive = !reducedMotion && !isMobile;
+  const immersive = useIsImmersive();
+
+  if (!immersive) return <FallbackStack />;
 
   return (
     <>
-      {!reducedMotion && <ParticleField />}
-      {immersive ? <SceneTrack /> : <FallbackLayout />}
-      <SideNav />
+      <SceneStage />
+      <ChapterTracker />
       <KeyboardNav />
     </>
   );
@@ -27,10 +25,10 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   return (
-    <ScrollProvider>
+    <ScrollTimelineProvider>
       {loading && <Loader onDone={() => setLoading(false)} />}
       <Experience />
-    </ScrollProvider>
+    </ScrollTimelineProvider>
   );
 }
 
