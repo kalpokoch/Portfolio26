@@ -17,6 +17,10 @@
 
 :root {
   color-scheme: dark;
+  /* Shared motion tokens — every transition/animation on the page draws from these so
+     micro-interactions (hovers, tracker dots) and reveals all decelerate the same way. */
+  --dur-quick: 0.2s;
+  --dur-reveal: 0.45s;
 }
 
 body {
@@ -36,6 +40,18 @@ body {
   color: var(--color-text);
   font-family: var(--font-sans);
   overscroll-behavior: none;
+}
+
+/* Immersive mode drives position via the chapter tracker; the native scrollbar is just
+   noise there (scrolling itself still works). The fallback stack keeps its scrollbar. */
+html.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
 }
 
 /* A single soft light source, not busy graphics — the only background depth cue. */
@@ -132,6 +148,34 @@ h3 {
   margin-top: 0.35rem;
 }
 
+/* Underlined text links: .signal-link is the accent treatment used in chapter content,
+   .rail-link the dimmer spine variant — identical timing, identical mechanics. */
+.signal-link,
+.rail-link {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  transition:
+    color var(--dur-quick) var(--ease-signal),
+    text-decoration-color var(--dur-quick) var(--ease-signal);
+}
+
+.signal-link {
+  text-decoration-color: rgba(143, 191, 163, 0.4);
+}
+
+.signal-link:hover {
+  text-decoration-color: var(--color-signal);
+}
+
+.rail-link {
+  text-decoration-color: rgba(237, 234, 226, 0.2);
+}
+
+.rail-link:hover {
+  color: var(--color-signal);
+  text-decoration-color: rgba(143, 191, 163, 0.6);
+}
+
 .hairline {
   border: none;
   border-top: 1px solid rgba(237, 234, 226, 0.12);
@@ -159,8 +203,15 @@ h3 {
   animation: rise-in 0.9s var(--ease-signal) both;
 }
 
+/* Quick rise for content that swaps in place (e.g. the Projects carousel card) — same
+   curve as mount-reveal, shorter runway. */
+.step-reveal {
+  animation: rise-in var(--dur-reveal) var(--ease-signal) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .mount-reveal {
+  .mount-reveal,
+  .step-reveal {
     animation: none;
   }
 }

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { experience } from "../content/experience";
 import { education } from "../content/skills";
 import { useSceneProgress } from "../lib/use-scene-progress";
+import { sceneInnerLocal, steppedCarouselPosition } from "../lib/scene-registry";
 import { useIsImmersive } from "../lib/use-immersive";
 import SplitColumn from "../components/SplitColumn";
 import Stat from "../components/Stat";
@@ -16,12 +17,13 @@ export default function JourneyScene() {
   useSceneProgress(
     "journey",
     (local) => {
+      const position = steppedCarouselPosition(sceneInnerLocal(local, "journey"), experience.length);
       const windowWidth = windowRef.current?.clientWidth ?? 0;
       const track = trackRef.current;
       if (track && windowWidth > 0) {
-        track.style.transform = `translate3d(${-local * (experience.length - 1) * windowWidth}px, 0, 0)`;
+        track.style.transform = `translate3d(${-position * windowWidth}px, 0, 0)`;
       }
-      const step = Math.min(experience.length - 1, Math.floor(local * experience.length));
+      const step = Math.round(position);
       if (step !== lastStep.current) {
         lastStep.current = step;
         setActiveStep(step);
@@ -54,7 +56,7 @@ export default function JourneyScene() {
           <ol
             ref={trackRef}
             className="flex will-change-transform"
-            style={{ transform: "translate3d(0%, 0, 0)", transition: "transform 120ms linear" }}
+            style={{ transform: "translate3d(0, 0, 0)" }}
           >
             {experience.map((entry) => (
               <li key={entry.role + entry.dates} className="w-full shrink-0 pr-4">
@@ -81,7 +83,7 @@ export default function JourneyScene() {
                     href={entry.link}
                     target="_blank"
                     rel="noreferrer"
-                    className="type-meta mt-6 inline-block text-[#8FBFA3] underline decoration-[#8FBFA3]/40 underline-offset-4 hover:decoration-[#8FBFA3]"
+                    className="signal-link type-meta mt-6 inline-block text-[#8FBFA3]"
                   >
                     {entry.link.replace("https://", "")}
                   </a>
@@ -117,7 +119,7 @@ export default function JourneyScene() {
                   href={entry.link}
                   target="_blank"
                   rel="noreferrer"
-                  className="type-meta mt-5 inline-block text-[#8FBFA3] underline decoration-[#8FBFA3]/40 underline-offset-4 hover:decoration-[#8FBFA3]"
+                  className="signal-link type-meta mt-5 inline-block text-[#8FBFA3]"
                 >
                   {entry.link.replace("https://", "")}
                 </a>

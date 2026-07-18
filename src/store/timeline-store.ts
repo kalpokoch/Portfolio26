@@ -9,9 +9,12 @@ interface TimelineState {
   isLoading: boolean;
   reducedMotion: boolean;
   deviceTier: DeviceTier;
+  /** True once the background (cosmos first frame, or no background applicable) is on screen — the loader holds until then. */
+  backgroundReady: boolean;
   setProgress: (p: number) => void;
   setActiveSceneIndex: (i: number) => void;
   setLoading: (v: boolean) => void;
+  setBackgroundReady: (v: boolean) => void;
   setReducedMotion: (v: boolean) => void;
   setDeviceTier: (t: DeviceTier) => void;
 }
@@ -22,10 +25,12 @@ export const timelineStore = createStore<TimelineState>((set) => ({
   isLoading: true,
   reducedMotion: false,
   deviceTier: "high",
+  backgroundReady: false,
   setProgress: (p) => set({ progress: p }),
   setActiveSceneIndex: (i) =>
     set((s) => (s.activeSceneIndex === i ? s : { activeSceneIndex: i })),
   setLoading: (v) => set({ isLoading: v }),
+  setBackgroundReady: (v) => set({ backgroundReady: v }),
   setReducedMotion: (v) => set({ reducedMotion: v }),
   setDeviceTier: (t) => set({ deviceTier: t }),
 }));

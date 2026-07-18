@@ -1,4 +1,5 @@
 import type { SceneConfig, SceneRange } from "../types/scene";
+import { smoothstep } from "./scroll-reveal";
 import { experience } from "../content/experience";
 import { projects } from "../content/projects";
 import HeroScene from "../scenes/HeroScene";
@@ -49,21 +50,69 @@ export function activeSceneIndex(globalProgress: number): number {
 }
 
 // Fade width in GLOBAL progress units (not a fraction of each scene's own span) — every
-// boundary gets the same ~7%-of-total crossfade regardless of chapter weight, so short and
-// long chapters transition at the same felt speed instead of some cutting abruptly.
+// boundary gets the same fade runway regardless of chapter weight, so short and long
+// chapters transition at the same felt speed instead of some cutting abruptly.
+// The outgoing scene finishes fading out *before* the incoming one starts fading in
+// (a dip-through-background dissolve), so two chapters' text is never visible at once.
 const FADE = 0.035;
+
+/**
+ * Each scene's local-progress margins consumed by its boundary fades: the scene is only
+ * fully visible for local progress in [inM, 1 - outM]. First/last scenes have no fade on
+ * their outer edge.
+ */
+function sceneFadeMargins(rangeIndex: number): { inM: number; outM: number } {
+  const range = SCENE_RANGES[rangeIndex];
+  const width = range ? range.end - range.start : 0;
+  const m = width > 0 ? FADE / width : 0;
+  return {
+    inM: rangeIndex === 0 ? 0 : m,
+    outM: rangeIndex === SCENE_RANGES.length - 1 ? 0 : m,
+  };
+}
+
+/**
+ * Remaps a scene's raw local progress so 0..1 spans only its fully-visible window between
+ * the boundary fades. Carousel scenes drive their sub-progression off this, so step 0 is
+ * fully on screen the moment the fade-in completes (instead of half its runway being spent
+ * invisible inside the fade), and settle targets from `sceneSettledProgress` land exactly
+ * on step boundaries in the same frame.
+ */
+export function sceneInnerLocal(local: number, sceneId: string): number {
+  const idx = SCENE_RANGES.findIndex((r) => r.id === sceneId);
+  if (idx === -1) return 0;
+  const { inM, outM } = sceneFadeMargins(idx);
+  const span = 1 - inM - outM;
+  if (span <= 0) return 0;
+  return Math.min(1, Math.max(0, (local - inM) / span));
+}
+
+// Portion of each inter-step segment spent actually sliding; the rest is dwell on either
+// side, so every card holds still long enough to read before easing to the next.
+const SLIDE_FRAC = 0.45;
+
+/**
+ * Maps an inner-local progress (see `sceneInnerLocal`) to a carousel position in
+ * 0..steps-1 that dwells on each step and only slides through the middle of each segment,
+ * with ease-in-out — instead of the track drifting linearly with every scroll pixel.
+ */
+export function steppedCarouselPosition(innerLocal: number, steps: number): number {
+  if (steps <= 1) return 0;
+  const pos = Math.min(1, Math.max(0, innerLocal)) * (steps - 1);
+  const i = Math.min(steps - 2, Math.floor(pos));
+  const f = pos - i;
+  const slideStart = (1 - SLIDE_FRAC) / 2;
+  return i + smoothstep(slideStart, slideStart + SLIDE_FRAC, f);
+}
 
 /**
  * The progress value where a chapter is fully settled — the shared target for both manual
  * chapter-jumps and scroll auto-snap. For chapters with an internal carousel (`steps`), this
- * is the nearest exact step boundary to `currentLocal` (matching the carousel's own slide math,
- * `i / (steps - 1)`), so settling never leaves it mid-slide between two entries. For chapters
- * with a single view, the center is the only candidate.
+ * is the nearest step boundary to `currentLocal`; for single-view chapters, the center.
  *
- * Candidates are first filtered to whichever fall clear of this chapter's own cross-fade zone
- * with its neighbors — step 0's boundary, for instance, sits right at the previous chapter's
- * fade-out, so if it's excluded we settle on the next clean step instead (rather than clamping
- * the chosen boundary afterwards, which would land between two steps, matching neither).
+ * Boundaries live in the scene's fully-visible window (see `sceneInnerLocal`), clear of the
+ * boundary fades — every step, including the first and last, is a valid resting point, and
+ * a settled position always shows exactly one card with the scene at full opacity.
  */
 export function sceneSettledProgress(rangeIndex: number, currentLocal = 0): number {
   const range = SCENE_RANGES[rangeIndex];
@@ -71,22 +120,20 @@ export function sceneSettledProgress(rangeIndex: number, currentLocal = 0): numb
   if (!range || !scene) return 0;
 
   const width = range.end - range.start;
-  const safeMargin = width > 0 ? FADE / width : 0;
-  const isFirst = rangeIndex === 0;
-  const isLast = rangeIndex === SCENE_RANGES.length - 1;
-  const safeMin = isFirst ? 0 : safeMargin;
-  const safeMax = isLast ? 1 : 1 - safeMargin;
+  const { inM, outM } = sceneFadeMargins(rangeIndex);
+  const span = Math.max(0, 1 - inM - outM);
 
   const steps = scene.steps ?? 1;
   const boundaries =
-    steps <= 1 ? [0.5] : Array.from({ length: steps }, (_, i) => i / (steps - 1));
+    steps <= 1
+      ? [inM + span * 0.5]
+      : Array.from({ length: steps }, (_, i) => inM + span * (i / (steps - 1)));
+  // The final chapter may also rest at the very bottom of the page — otherwise scrolling to
+  // the end and pausing snaps the view back up mid-chapter, which reads as a glitch.
+  if (rangeIndex === SCENE_RANGES.length - 1) boundaries.push(1);
 
-  const validBoundaries = boundaries.filter((b) => b >= safeMin && b <= safeMax);
-  const candidates =
-    validBoundaries.length > 0 ? validBoundaries : [Math.min(Math.max(0.5, safeMin), safeMax)];
-
-  let localTarget = candidates[0];
-  for (const b of candidates) {
+  let localTarget = boundaries[0];
+  for (const b of boundaries) {
     if (Math.abs(b - currentLocal) < Math.abs(localTarget - currentLocal)) {
       localTarget = b;
     }
@@ -95,7 +142,28 @@ export function sceneSettledProgress(rangeIndex: number, currentLocal = 0): numb
   return range.start + localTarget * width;
 }
 
-/** Windowed cross-fade: 1 inside a scene's steady zone, ramping to 0 across a shared overlap with each neighbor. */
+/**
+ * Which two scenes the background signal is morphing between, and how far along (0..1).
+ * Uses the exact same FADE window as `sceneOpacity`, so the canvas morph is locked to the
+ * text dissolve by construction: the shape transforms precisely while the text dips out.
+ */
+export function sceneMorphBlend(globalProgress: number): { from: number; to: number; t: number } {
+  for (let i = 0; i < SCENE_RANGES.length - 1; i++) {
+    const boundary = SCENE_RANGES[i].end;
+    if (globalProgress >= boundary - FADE && globalProgress <= boundary + FADE) {
+      return { from: i, to: i + 1, t: smoothstep(boundary - FADE, boundary + FADE, globalProgress) };
+    }
+  }
+  const idx = activeSceneIndex(globalProgress);
+  return { from: idx, to: idx, t: 0 };
+}
+
+/**
+ * Sequential dissolve: 1 inside a scene's steady zone, ramping to 0 entirely *within* the
+ * scene's own range at each boundary. The outgoing scene reaches 0 exactly where the
+ * incoming one starts from 0 — a brief dip through the dark background instead of a
+ * 50/50 overlap where both chapters' text is legible at once.
+ */
 export function sceneOpacity(globalProgress: number, rangeIndex: number): number {
   const range = SCENE_RANGES[rangeIndex];
   if (!range) return 0;
@@ -103,17 +171,11 @@ export function sceneOpacity(globalProgress: number, rangeIndex: number): number
   const isLast = rangeIndex === SCENE_RANGES.length - 1;
 
   let opacity = 1;
-  if (!isFirst) {
-    const fadeInEnd = range.start + FADE;
-    if (globalProgress < fadeInEnd) {
-      opacity = Math.min(opacity, (globalProgress - (range.start - FADE)) / (FADE * 2));
-    }
+  if (!isFirst && globalProgress < range.start + FADE) {
+    opacity = Math.min(opacity, (globalProgress - range.start) / FADE);
   }
-  if (!isLast) {
-    const fadeOutStart = range.end - FADE;
-    if (globalProgress > fadeOutStart) {
-      opacity = Math.min(opacity, (range.end + FADE - globalProgress) / (FADE * 2));
-    }
+  if (!isLast && globalProgress > range.end - FADE) {
+    opacity = Math.min(opacity, (range.end - globalProgress) / FADE);
   }
 
   return Math.max(0, Math.min(1, opacity));

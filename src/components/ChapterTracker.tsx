@@ -22,14 +22,14 @@ export default function ChapterTracker() {
             className="group flex items-center gap-3"
           >
             <span
-              className={`font-mono text-[0.6rem] uppercase tracking-[0.28em] transition-colors ${
+              className={`font-mono text-[0.6rem] uppercase tracking-[0.28em] transition-colors duration-200 ease-[var(--ease-signal)] ${
                 active ? "text-[#EDEAE2]" : "text-[#5B6660] group-hover:text-[#9AA39C]"
               }`}
             >
               {scene.title}
             </span>
             <span
-              className={`h-1.5 w-1.5 rounded-full transition-colors ${
+              className={`h-1.5 w-1.5 rounded-full transition-colors duration-200 ease-[var(--ease-signal)] ${
                 active ? "bg-[#8FBFA3]" : "bg-[#5B6660]"
               }`}
             />

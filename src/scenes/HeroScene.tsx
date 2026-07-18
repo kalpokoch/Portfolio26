@@ -36,9 +36,15 @@ export default function HeroScene() {
       railLabel={profile.role}
       rail={
         <>
-          <p className="type-meta">{contact.email}</p>
-          <p className="type-meta">{contact.github}</p>
-          <p className="type-meta">{contact.linkedin}</p>
+          <a href={`mailto:${contact.email}`} className="type-meta rail-link">
+            {contact.email}
+          </a>
+          <a href={contact.githubUrl} target="_blank" rel="noreferrer" className="type-meta rail-link">
+            {contact.github}
+          </a>
+          <a href={contact.linkedinUrl} target="_blank" rel="noreferrer" className="type-meta rail-link">
+            {contact.linkedin}
+          </a>
         </>
       }
     >

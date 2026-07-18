@@ -3,6 +3,7 @@ import { contact } from "../content/profile";
 import { education, certifications } from "../content/skills";
 import { useSceneProgress } from "../lib/use-scene-progress";
 import { scrollReveal, scrollSettle } from "../lib/scroll-reveal";
+import { sceneInnerLocal } from "../lib/scene-registry";
 import { useIsImmersive } from "../lib/use-immersive";
 import SplitColumn from "../components/SplitColumn";
 
@@ -24,10 +25,11 @@ export default function ContactScene() {
   useSceneProgress(
     "contact",
     (local) => {
-      scrollReveal(linksRef.current, local, 0, 1, 14);
-      scrollSettle(educationRef.current, local);
-      scrollSettle(certsRef.current, local);
-      scrollReveal(closingRef.current, local, 1, 2, 10);
+      const inner = sceneInnerLocal(local, "contact");
+      scrollReveal(linksRef.current, inner, 0, 1, 14);
+      scrollSettle(educationRef.current, inner);
+      scrollSettle(certsRef.current, inner);
+      scrollReveal(closingRef.current, inner, 1, 2, 10);
     },
     immersive,
   );
@@ -47,7 +49,7 @@ export default function ContactScene() {
             href={link.href}
             target={link.href.startsWith("http") ? "_blank" : undefined}
             rel={link.href.startsWith("http") ? "noreferrer" : undefined}
-            className="type-meta inline-block w-fit text-[#EDEAE2] underline decoration-[#8FBFA3]/40 underline-offset-4 hover:decoration-[#8FBFA3]"
+            className="signal-link type-meta inline-block w-fit text-[#EDEAE2]"
           >
             {link.label} <span className="divider">/</span> {link.value}
           </a>

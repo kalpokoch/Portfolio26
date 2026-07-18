@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { skills } from "../content/skills";
 import { useSceneProgress } from "../lib/use-scene-progress";
 import { scrollReveal } from "../lib/scroll-reveal";
+import { sceneInnerLocal } from "../lib/scene-registry";
 import { useIsImmersive } from "../lib/use-immersive";
 import SplitColumn from "../components/SplitColumn";
 
@@ -14,7 +15,8 @@ export default function SkillsScene() {
   useSceneProgress(
     "skills",
     (local) => {
-      GROUPS.forEach((_, i) => scrollReveal(groupRefs.current[i], local, i, GROUPS.length, 22));
+      const inner = sceneInnerLocal(local, "skills");
+      GROUPS.forEach((_, i) => scrollReveal(groupRefs.current[i], inner, i, GROUPS.length, 22));
     },
     immersive,
   );

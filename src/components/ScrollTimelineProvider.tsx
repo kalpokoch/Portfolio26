@@ -106,7 +106,7 @@ export function ScrollTimelineProvider({ children }: { children: ReactNode }) {
     if (st && lenisRef.current) {
       const settled = sceneSettledProgress(index);
       const target = st.start + settled * (st.end - st.start);
-      lenisRef.current.scrollTo(target, { duration: 1.2 });
+      lenisRef.current.scrollTo(target, { duration: 1.2, easing: easeOutCubic });
       return;
     }
     document

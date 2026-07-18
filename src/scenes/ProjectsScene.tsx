@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { projects, type ProjectEntry } from "../content/projects";
 import { useSceneProgress } from "../lib/use-scene-progress";
+import { sceneInnerLocal, steppedCarouselPosition } from "../lib/scene-registry";
 import { useIsImmersive } from "../lib/use-immersive";
 import SplitColumn from "../components/SplitColumn";
 import Stat from "../components/Stat";
@@ -25,7 +26,7 @@ function ProjectContent({ project }: { project: ProjectEntry }) {
         href={project.link}
         target="_blank"
         rel="noreferrer"
-        className="type-meta mt-6 inline-block text-[#8FBFA3] underline decoration-[#8FBFA3]/40 underline-offset-4 hover:decoration-[#8FBFA3]"
+        className="signal-link type-meta mt-6 inline-block text-[#8FBFA3]"
       >
         {project.link.replace("https://", "")}
       </a>
@@ -41,7 +42,9 @@ export default function ProjectsScene() {
   useSceneProgress(
     "projects",
     (local) => {
-      const step = Math.min(projects.length - 1, Math.floor(local * projects.length));
+      const step = Math.round(
+        steppedCarouselPosition(sceneInnerLocal(local, "projects"), projects.length),
+      );
       if (step !== lastStep.current) {
         lastStep.current = step;
         setActiveStep(step);
@@ -64,7 +67,9 @@ export default function ProjectsScene() {
       }
     >
       {immersive ? (
-        <ProjectContent project={projects[activeStep]} />
+        <div key={activeStep} className="step-reveal">
+          <ProjectContent project={projects[activeStep]} />
+        </div>
       ) : (
         <div className="flex flex-col gap-12">
           {projects.map((project, i) => (
