@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { SCENES } from "../lib/scene-registry";
+import { useIsImmersive } from "../lib/use-immersive";
 
 interface SplitColumnProps {
   sceneId: string;
@@ -18,6 +19,7 @@ interface SplitColumnProps {
 export default function SplitColumn({ sceneId, railLabel, rail, ariaLabel, children }: SplitColumnProps) {
   const index = SCENES.findIndex((s) => s.id === sceneId);
   const chapterNumber = String(index + 1).padStart(2, "0");
+  const immersive = useIsImmersive();
 
   return (
     <section
@@ -34,8 +36,29 @@ export default function SplitColumn({ sceneId, railLabel, rail, ariaLabel, child
         {rail && <div className="mt-auto flex flex-col gap-2">{rail}</div>}
       </div>
       <div className="hidden bg-[#EDEAE2]/[0.12] sm:block" aria-hidden="true" />
-      <div className="flex min-w-0 flex-col justify-center px-6 pb-10 pt-2 sm:h-full sm:px-10 sm:pb-14 sm:pt-10">
-        {children}
+      <div
+        className={`relative flex min-w-0 flex-col justify-center overflow-hidden px-6 pb-10 pt-2 sm:h-full sm:px-10 sm:pb-14 sm:pt-10 ${
+          // Reserve the ChapterTracker's gutter (right-6 + widest label + dot) only in the
+          // immersive path, where a sliding carousel card can otherwise travel far enough
+          // right to visually collide with the fixed nav — the fallback stack has no
+          // tracker, so it keeps the full column width.
+          immersive ? "sm:pr-36" : ""
+        }`}
+      >
+        {/* Recedes the cosmos silhouette right behind the text block (mountains/ridge lines
+            can otherwise cut across paragraphs) without adding any new graphic — a plain
+            legibility scrim, confined to this column only. */}
+        {immersive && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-0 hidden w-full sm:block"
+            style={{
+              background:
+                "linear-gradient(90deg, rgba(10,13,11,0.4) 0%, rgba(10,13,11,0.16) 45%, transparent 72%)",
+            }}
+          />
+        )}
+        <div className="relative">{children}</div>
       </div>
     </section>
   );

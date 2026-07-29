@@ -16,7 +16,9 @@ const REVEAL_COMPLETE = 0.5;
 
 /** Staggered entrance: element `index` of `count` fades/rises in during its own slice of local progress. */
 export function staggeredReveal(local: number, index: number, count: number): number {
-  const stagger = count > 1 ? 0.09 : 0;
+  // Wider gap between each element's start (was 0.09) so the sequence reads as a deliberate
+  // stagger at normal scroll speed instead of resolving almost simultaneously.
+  const stagger = count > 1 ? 0.14 : 0;
   const duration = 0.4;
   // Normalize so the LAST element's reveal completes exactly at REVEAL_COMPLETE.
   const scale = REVEAL_COMPLETE / ((count - 1) * stagger + duration);
@@ -24,7 +26,7 @@ export function staggeredReveal(local: number, index: number, count: number): nu
   return smoothstep(start, start + duration * scale, local);
 }
 
-export function revealTransform(reveal: number, riseBy = 22): string {
+export function revealTransform(reveal: number, riseBy = 32): string {
   return `translateY(${(1 - reveal) * riseBy}px)`;
 }
 
@@ -34,7 +36,7 @@ export function scrollReveal(
   local: number,
   index: number,
   count: number,
-  riseBy = 22,
+  riseBy = 32,
 ): void {
   if (!el) return;
   const reveal = staggeredReveal(local, index, count);

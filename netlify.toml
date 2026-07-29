@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-page app: any path (deep link, refresh, share URL) should still serve index.html
+# rather than 404 — there's no server-side router, everything renders from one entry point.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -44,7 +44,7 @@ export default function JourneyScene() {
             {education.degree} · {education.dates}
           </p>
           {immersive && (
-            <p className="type-meta mt-4 text-[#5B6660]">
+            <p className="type-meta mt-4 text-[var(--color-muted-strong)]">
               {String(activeStep + 1).padStart(2, "0")} / {String(experience.length).padStart(2, "0")}
             </p>
           )}

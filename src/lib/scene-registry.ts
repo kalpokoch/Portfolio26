@@ -106,6 +106,28 @@ export function steppedCarouselPosition(innerLocal: number, steps: number): numb
 }
 
 /**
+ * The local-progress positions (within the scene's fully-visible window, see
+ * `sceneInnerLocal`) a chapter can rest at: one per carousel step, or a single center point
+ * for chapters with no internal carousel. Shared by `sceneSettledProgress` (nearest-boundary
+ * snap) and `sceneStepProgress` (jump to an exact step).
+ */
+function sceneStepBoundaries(rangeIndex: number): number[] {
+  const scene = SCENES[rangeIndex];
+  if (!scene) return [0.5];
+  const { inM, outM } = sceneFadeMargins(rangeIndex);
+  const span = Math.max(0, 1 - inM - outM);
+  const steps = scene.steps ?? 1;
+  const boundaries =
+    steps <= 1
+      ? [inM + span * 0.5]
+      : Array.from({ length: steps }, (_, i) => inM + span * (i / (steps - 1)));
+  // The final chapter may also rest at the very bottom of the page — otherwise scrolling to
+  // the end and pausing snaps the view back up mid-chapter, which reads as a glitch.
+  if (rangeIndex === SCENE_RANGES.length - 1) boundaries.push(1);
+  return boundaries;
+}
+
+/**
  * The progress value where a chapter is fully settled — the shared target for both manual
  * chapter-jumps and scroll auto-snap. For chapters with an internal carousel (`steps`), this
  * is the nearest step boundary to `currentLocal`; for single-view chapters, the center.
@@ -116,21 +138,9 @@ export function steppedCarouselPosition(innerLocal: number, steps: number): numb
  */
 export function sceneSettledProgress(rangeIndex: number, currentLocal = 0): number {
   const range = SCENE_RANGES[rangeIndex];
-  const scene = SCENES[rangeIndex];
-  if (!range || !scene) return 0;
-
+  if (!range) return 0;
   const width = range.end - range.start;
-  const { inM, outM } = sceneFadeMargins(rangeIndex);
-  const span = Math.max(0, 1 - inM - outM);
-
-  const steps = scene.steps ?? 1;
-  const boundaries =
-    steps <= 1
-      ? [inM + span * 0.5]
-      : Array.from({ length: steps }, (_, i) => inM + span * (i / (steps - 1)));
-  // The final chapter may also rest at the very bottom of the page — otherwise scrolling to
-  // the end and pausing snaps the view back up mid-chapter, which reads as a glitch.
-  if (rangeIndex === SCENE_RANGES.length - 1) boundaries.push(1);
+  const boundaries = sceneStepBoundaries(rangeIndex);
 
   let localTarget = boundaries[0];
   for (const b of boundaries) {
@@ -140,6 +150,33 @@ export function sceneSettledProgress(rangeIndex: number, currentLocal = 0): numb
   }
 
   return range.start + localTarget * width;
+}
+
+/**
+ * The global progress value for an EXACT step within a chapter's carousel (as opposed to
+ * `sceneSettledProgress`'s nearest-to-current lookup) — used to jump straight to a specific
+ * sub-item, e.g. clicking "03" in the chapter tracker's expanded step list.
+ */
+export function sceneStepProgress(rangeIndex: number, stepIndex: number): number {
+  const range = SCENE_RANGES[rangeIndex];
+  const scene = SCENES[rangeIndex];
+  if (!range || !scene) return 0;
+  const width = range.end - range.start;
+  const boundaries = sceneStepBoundaries(rangeIndex);
+  const steps = scene.steps ?? 1;
+  const clamped = Math.min(Math.max(stepIndex, 0), steps - 1);
+  return range.start + boundaries[clamped] * width;
+}
+
+/** Which carousel step (0-based) a chapter's own local progress currently sits on. */
+export function sceneActiveStep(globalProgress: number, rangeIndex: number): number {
+  const scene = SCENES[rangeIndex];
+  if (!scene) return 0;
+  const steps = scene.steps ?? 1;
+  if (steps <= 1) return 0;
+  const local = sceneLocalProgress(globalProgress, scene.id);
+  const inner = sceneInnerLocal(local, scene.id);
+  return Math.round(steppedCarouselPosition(inner, steps));
 }
 
 /**

@@ -60,7 +60,7 @@ export default function ProjectsScene() {
       railLabel="Projects"
       rail={
         immersive ? (
-          <p className="type-meta text-[#5B6660]">
+          <p className="type-meta text-[var(--color-muted-strong)]">
             {String(activeStep + 1).padStart(2, "0")} / {String(projects.length).padStart(2, "0")}
           </p>
         ) : undefined

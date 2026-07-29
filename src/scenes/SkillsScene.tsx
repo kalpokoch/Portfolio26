@@ -16,7 +16,7 @@ export default function SkillsScene() {
     "skills",
     (local) => {
       const inner = sceneInnerLocal(local, "skills");
-      GROUPS.forEach((_, i) => scrollReveal(groupRefs.current[i], inner, i, GROUPS.length, 22));
+      GROUPS.forEach((_, i) => scrollReveal(groupRefs.current[i], inner, i, GROUPS.length, 32));
     },
     immersive,
   );

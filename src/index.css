@@ -5,11 +5,14 @@
   --color-signal: #8fbfa3;
   --color-signal-bright: #b6dcc4;
   --color-muted: #5b6660;
+  /* AA-safe (4.6:1) variant of --color-muted, for secondary text that carries real content
+     (stat labels, step counters) rather than purely decorative dimming (nav, loader). */
+  --color-muted-strong: #717e77;
   --color-text: #edeae2;
   --color-text-dim: #9aa39c;
 
   --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
 
   --ease-signal: cubic-bezier(0.22, 1, 0.36, 1);
@@ -144,7 +147,7 @@ h3 {
   font-size: 0.62rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--color-muted-strong);
   margin-top: 0.35rem;
 }
 
@@ -164,7 +167,7 @@ h3 {
 }
 
 .signal-link:hover {
-  text-decoration-color: var(--color-signal);
+  text-decoration-color: var(--color-signal-bright);
 }
 
 .rail-link {
@@ -172,7 +175,7 @@ h3 {
 }
 
 .rail-link:hover {
-  color: var(--color-signal);
+  color: var(--color-signal-bright);
   text-decoration-color: rgba(143, 191, 163, 0.6);
 }
 

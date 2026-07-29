@@ -14,6 +14,7 @@ import {
   activeSceneIndex,
   sceneLocalProgress,
   sceneSettledProgress,
+  sceneStepProgress,
 } from "../lib/scene-registry";
 import { timelineStore } from "../store/timeline-store";
 import { useReducedMotion } from "../lib/use-reduced-motion";
@@ -23,6 +24,7 @@ import { measureDeviceTier } from "../lib/device-tier";
 interface TimelineContextValue {
   trackRef: RefObject<HTMLDivElement | null>;
   scrollToScene: (index: number) => void;
+  scrollToStep: (sceneIndex: number, stepIndex: number) => void;
 }
 
 const TimelineContext = createContext<TimelineContextValue | null>(null);
@@ -114,8 +116,23 @@ export function ScrollTimelineProvider({ children }: { children: ReactNode }) {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const scrollToStep = (sceneIndex: number, stepIndex: number) => {
+    const range = SCENE_RANGES[sceneIndex];
+    if (!range) return;
+    const st = stRef.current;
+    if (st && lenisRef.current) {
+      const target =
+        st.start + sceneStepProgress(sceneIndex, stepIndex) * (st.end - st.start);
+      lenisRef.current.scrollTo(target, { duration: 1, easing: easeOutCubic });
+      return;
+    }
+    document
+      .getElementById(`scene-${range.id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
-    <TimelineContext.Provider value={{ trackRef, scrollToScene }}>
+    <TimelineContext.Provider value={{ trackRef, scrollToScene, scrollToStep }}>
       {children}
     </TimelineContext.Provider>
   );
