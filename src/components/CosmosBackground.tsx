@@ -222,7 +222,36 @@ export default function CosmosBackground() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const scene = new THREE.Scene();
+    // WebGL context creation can throw outright — e.g. the browser's live-context limit
+    // (mobile Safari/Android cap this per-page, sometimes as low as 8-16 across every open
+    // tab) already being exhausted, or a GPU driver hiccup. Left uncaught, that error had no
+    // boundary above it and silently killed the background for the rest of the session, with
+    // no way to recover short of a full reload. Fail soft instead: log it, unblock the
+    // loader, and simply render no background.
+    let cleanup: (() => void) | null = null;
+    try {
+      cleanup = setupScene(canvas);
+    } catch (err) {
+      console.warn("CosmosBackground: WebGL setup failed, continuing without it.", err);
+      timelineStore.getState().setBackgroundReady(true);
+      return;
+    }
+    return cleanup ?? undefined;
+  }, [deviceTier]);
+
+  if (deviceTier === "low") return null;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-0 h-full w-full"
+    />
+  );
+}
+
+function setupScene(canvas: HTMLCanvasElement): () => void {
+  const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x000000, 0.00025);
 
     const camera = new THREE.PerspectiveCamera(
@@ -382,15 +411,4 @@ export default function CosmosBackground() {
       composer.dispose();
       renderer.dispose();
     };
-  }, [deviceTier]);
-
-  if (deviceTier === "low") return null;
-
-  return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-0 h-full w-full"
-    />
-  );
 }
