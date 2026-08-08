@@ -4,10 +4,11 @@ import SceneStage from "./components/SceneStage";
 import ChapterTracker from "./components/ChapterTracker";
 import KeyboardNav from "./components/KeyboardNav";
 import FallbackStack from "./components/FallbackStack";
+import MobileStack from "./components/MobileStack";
 import Loader from "./components/Loader";
 import CosmosErrorBoundary from "./components/CosmosErrorBoundary";
-import { useIsImmersive } from "./lib/use-immersive";
-import { timelineStore } from "./store/timeline-store";
+import { useIsImmersive, useIsMobileImmersive } from "./lib/use-immersive";
+import { timelineStore, useTimelineStore } from "./store/timeline-store";
 
 /**
  * A dynamic import can reject on a transient network blip (common on mobile connections) —
@@ -34,17 +35,25 @@ const CosmosBackground = lazyWithRetry(() => import("./components/CosmosBackgrou
 
 function Experience() {
   const immersive = useIsImmersive();
+  const mobileImmersive = useIsMobileImmersive();
+  const reducedMotion = useTimelineStore((s) => s.reducedMotion);
 
   useEffect(() => {
-    if (!immersive) {
-      // Fallback path has no cosmos — the loader shouldn't wait for one.
+    if (reducedMotion) {
+      // The fully static fallback has no cosmos of its own — the loader shouldn't wait
+      // for a background that's never coming.
       timelineStore.getState().setBackgroundReady(true);
       return;
     }
-    document.documentElement.classList.add("no-scrollbar");
-    return () => document.documentElement.classList.remove("no-scrollbar");
-  }, [immersive]);
+    if (immersive) {
+      document.documentElement.classList.add("no-scrollbar");
+      return () => document.documentElement.classList.remove("no-scrollbar");
+    }
+    // mobileImmersive: MobileCosmosBackground marks backgroundReady itself once its first
+    // frame is on screen.
+  }, [reducedMotion, immersive]);
 
+  if (mobileImmersive) return <MobileStack />;
   if (!immersive) return <FallbackStack />;
 
   return (

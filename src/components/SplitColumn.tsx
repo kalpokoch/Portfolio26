@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { SCENES } from "../lib/scene-registry";
-import { useIsImmersive } from "../lib/use-immersive";
+import { useIsImmersive, useIsMobileImmersive } from "../lib/use-immersive";
 
 interface SplitColumnProps {
   sceneId: string;
@@ -20,6 +20,7 @@ export default function SplitColumn({ sceneId, railLabel, rail, ariaLabel, child
   const index = SCENES.findIndex((s) => s.id === sceneId);
   const chapterNumber = String(index + 1).padStart(2, "0");
   const immersive = useIsImmersive();
+  const mobileImmersive = useIsMobileImmersive();
 
   return (
     <section
@@ -45,9 +46,11 @@ export default function SplitColumn({ sceneId, railLabel, rail, ariaLabel, child
           immersive ? "sm:pr-36" : ""
         }`}
       >
-        {/* Recedes the cosmos silhouette right behind the text block (mountains/ridge lines
-            can otherwise cut across paragraphs) without adding any new graphic — a plain
-            legibility scrim, confined to this column only. */}
+        {/* Recedes the cosmos background right behind the text block without adding any new
+            graphic — a plain legibility scrim, confined to this column only. Desktop's
+            two-column layout gets a directional gradient (background is to the right);
+            mobile's single stacked column has no "side" for it to lean toward, so it gets a
+            flat backing panel instead, behind the same text block. */}
         {immersive && (
           <div
             aria-hidden="true"
@@ -56,6 +59,13 @@ export default function SplitColumn({ sceneId, railLabel, rail, ariaLabel, child
               background:
                 "linear-gradient(90deg, rgba(10,13,11,0.4) 0%, rgba(10,13,11,0.16) 45%, transparent 72%)",
             }}
+          />
+        )}
+        {mobileImmersive && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{ background: "rgba(10,13,11,0.32)" }}
           />
         )}
         <div className="relative">{children}</div>
