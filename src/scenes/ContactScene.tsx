@@ -5,6 +5,7 @@ import { useSceneProgress } from "../lib/use-scene-progress";
 import { scrollReveal, scrollSettle } from "../lib/scroll-reveal";
 import { sceneInnerLocal } from "../lib/scene-registry";
 import { useIsImmersive } from "../lib/use-immersive";
+import { timelineStore } from "../store/timeline-store";
 import SplitColumn from "../components/SplitColumn";
 
 const LINKS: { label: string; value: string; href: string }[] = [
@@ -14,6 +15,9 @@ const LINKS: { label: string; value: string; href: string }[] = [
   { label: "LinkedIn", value: contact.linkedin, href: contact.linkedinUrl },
   { label: "GitHub", value: contact.github, href: contact.githubUrl },
 ];
+
+/** Reaching for a way to get in touch pings the cosmos beacon (a no-op where there's no cosmos). */
+const sendSignal = () => timelineStore.getState().sendSignalPing();
 
 export default function ContactScene() {
   const immersive = useIsImmersive();
@@ -49,6 +53,8 @@ export default function ContactScene() {
             href={link.href}
             target={link.href.startsWith("http") ? "_blank" : undefined}
             rel={link.href.startsWith("http") ? "noreferrer" : undefined}
+            onPointerEnter={sendSignal}
+            onFocus={sendSignal}
             className="signal-link type-meta inline-block w-fit text-[#EDEAE2]"
           >
             {link.label} <span className="divider">/</span> {link.value}
