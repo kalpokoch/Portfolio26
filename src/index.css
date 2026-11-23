@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Neither the three.js scene code (GLSL in template strings) nor the project docs hold class
+   names, and words in them like "ring" would otherwise be picked up as utilities and ship as
+   dead CSS. */
+@source not "./cosmos";
+@source not "../*.md";
+
 @theme {
   --color-bg: #0a0d0b;
   --color-signal: #8fbfa3;

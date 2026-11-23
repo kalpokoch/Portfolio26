@@ -11,6 +11,13 @@ interface TimelineState {
   deviceTier: DeviceTier;
   /** True once the background (cosmos first frame, or no background applicable) is on screen — the loader holds until then. */
   backgroundReady: boolean;
+  /**
+   * Seconds (performance.now() clock, same as rAF timestamps) of the last "send a signal"
+   * gesture — pointing at or focusing a contact link. The cosmos Contact beacon answers each
+   * one with a ping ring. Read imperatively from the render loop, never via the reactive hook.
+   */
+  signalPingAt: number;
+  sendSignalPing: () => void;
   setProgress: (p: number) => void;
   setActiveSceneIndex: (i: number) => void;
   setLoading: (v: boolean) => void;
@@ -26,6 +33,8 @@ export const timelineStore = createStore<TimelineState>((set) => ({
   reducedMotion: false,
   deviceTier: "high",
   backgroundReady: false,
+  signalPingAt: Number.NEGATIVE_INFINITY,
+  sendSignalPing: () => set({ signalPingAt: performance.now() / 1000 }),
   setProgress: (p) => set({ progress: p }),
   setActiveSceneIndex: (i) =>
     set((s) => (s.activeSceneIndex === i ? s : { activeSceneIndex: i })),

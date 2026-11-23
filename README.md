@@ -66,6 +66,25 @@ own sub-progression, like Journey's experience carousel or Projects' per-project
 To change the pacing, edit the `weight` values in `src/lib/scene-registry.ts` — nothing else
 needs to change.
 
+## The cosmos background
+
+On capable desktops, **`src/components/CosmosBackground.tsx`** (three.js, lazy-loaded) flies a
+camera through a starfield past mountain silhouettes as you scroll, tinting the sky per chapter.
+Along the way each chapter has a landmark in the sky, defined in **`src/cosmos/`** and registered
+by scene id in `src/cosmos/landmarks.ts`:
+
+| Chapter | Landmark | Tied to the content |
+| --- | --- | --- |
+| Journey | Career constellation, one star per role | Route draws itself to the active carousel card |
+| Skills | Feed-forward neural network | Layers assemble with the skill groups; forward passes pulse through it |
+| Projects | Dark planet with one orbit per project | The active project's satellite flares and trails light |
+| Contact | Transmitting beacon | Pings when you arrive, and when you hover/focus a contact link |
+
+Landmarks fade exactly with their chapter's text and are placed relative to that chapter's
+camera waypoint. To give a chapter one, write a factory in `src/cosmos/` (see `types.ts`) and add
+it to `LANDMARKS`. Mobile gets a lightweight 2D starfield instead, and reduced-motion gets no
+background motion at all.
+
 ## Content
 
 Real content lives in `src/content/*.ts` (`profile`, `skills`, `experience`, `projects`).

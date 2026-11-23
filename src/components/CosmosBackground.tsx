@@ -7,10 +7,14 @@ import { getProgress, timelineStore, useTimelineStore } from "../store/timeline-
 import {
   SCENES,
   activeSceneIndex,
+  sceneInnerLocal,
   sceneLocalProgress,
   sceneMorphBlend,
+  sceneOpacity,
+  steppedCarouselPosition,
 } from "../lib/scene-registry";
 import { getHue } from "../lib/signal-forms";
+import { LANDMARKS } from "../cosmos/landmarks";
 
 /**
  * Site-wide three.js backdrop (adapted from the "Horizon" cosmos hero): a shader starfield,
@@ -35,6 +39,28 @@ const CAMERA_PATH: Record<string, readonly [number, number, number]> = {
 const END_CAM: readonly [number, number, number] = [0, 54, -760];
 const DEFAULT_CAM: readonly [number, number, number] = [0, 30, 300];
 const CAMERA_SMOOTHING = 0.05;
+// The flight's aim point. Through Hero→Skills the camera is far enough short of it that it
+// frames the horizon exactly as it always has; from Projects on, the aim slides ahead with
+// the camera instead of staying pinned. Pinned, the path overran it: the camera pitched down
+// at the floor across Projects, flipped 180° in one frame flying over it, and spent Contact
+// facing backwards at nothing.
+const LOOK_TARGET: readonly [number, number, number] = [0, 10, -600];
+const MIN_LOOK_AHEAD = 320;
+// Chapter landmarks' x offsets are authored for a 16:10 frame (see src/cosmos/types.ts).
+const LANDMARK_REF_ASPECT = 1.6;
+// The atmosphere's glow reads as a horizon glow only while mountains sit in front of it: even
+// faded out, their depth masks it below the ridge line. Past the last range there's no ground
+// left, and at full strength it washes the whole frame — body text in Projects measured ~3:1
+// against it. So once the flight clears the mountains, the glow eases down to this fraction,
+// over this stretch of flight (distance past the last range; negative = still before it).
+const OPEN_SPACE_GLOW = 0.3;
+const OPEN_SPACE_RAMP: readonly [number, number] = [-40, 80];
+// Multisampling safeguard: after a warm-up, the median frame interval is checked once; if the
+// GPU can't hold ~45fps with MSAA on, it's dropped for the session — aliased hairlines beat a
+// stuttering flight.
+const MSAA_WARMUP_FRAMES = 45;
+const MSAA_PROBE_FRAMES = 90;
+const MSAA_MAX_FRAME_MS = 22;
 
 const STAR_LAYERS = 3;
 const STARS_PER_LAYER = 3000;
@@ -114,11 +140,12 @@ const ATMOSPHERE_FRAGMENT = `
   varying vec3 vNormal;
   uniform float time;
   uniform vec3 tint;
+  uniform float strength;
 
   void main() {
     float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
     float pulse = sin(time * 2.0) * 0.1 + 0.9;
-    gl_FragColor = vec4(tint * intensity * pulse, intensity * 0.06);
+    gl_FragColor = vec4(tint * intensity * pulse, intensity * 0.06 * strength);
   }
 `;
 
@@ -273,7 +300,18 @@ function setupScene(canvas: HTMLCanvasElement): () => void {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.38;
 
-    const composer = new EffectComposer(renderer);
+    // Render the scene into a multisampled target: the renderer's own `antialias` only covers
+    // the default framebuffer, which the composer never draws the scene into — without this,
+    // mountain ridges and every hairline in the sky render aliased. High-DPI screens already
+    // hide aliasing and would pay 4× on a very large buffer, so they skip it.
+    const pixelRatio = renderer.getPixelRatio();
+    const composer = new EffectComposer(
+      renderer,
+      new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
+        type: THREE.HalfFloatType,
+        samples: pixelRatio < 1.5 ? 4 : 0,
+      }),
+    );
     composer.addPass(new RenderPass(scene, camera));
     composer.addPass(
       new UnrealBloomPass(
@@ -283,9 +321,13 @@ function setupScene(canvas: HTMLCanvasElement): () => void {
         0.9,
       ),
     );
+    // A supplied target is taken at face value; re-size once so buffers and passes pick up
+    // the pixel ratio exactly as the composer's default target would.
+    composer.setSize(window.innerWidth, window.innerHeight);
 
     const stars = buildStars(scene);
     const mountains = buildMountains(scene);
+    const lastRangeZ = Math.min(...mountains.map((m) => m.position.z));
 
     const nebulaMaterial = new THREE.ShaderMaterial({
       uniforms: {
@@ -306,15 +348,35 @@ function setupScene(canvas: HTMLCanvasElement): () => void {
     scene.add(nebula);
 
     const atmosphereMaterial = new THREE.ShaderMaterial({
-      uniforms: { time: { value: 0 }, tint: { value: new THREE.Color(0x8fbfa3) } },
+      uniforms: {
+        time: { value: 0 },
+        tint: { value: new THREE.Color(0x8fbfa3) },
+        strength: { value: 1 },
+      },
       vertexShader: ATMOSPHERE_VERTEX,
       fragmentShader: ATMOSPHERE_FRAGMENT,
       side: THREE.BackSide,
       blending: THREE.AdditiveBlending,
       transparent: true,
+      // An additive glow, not a surface: writing depth made its far wall hide anything placed
+      // beyond its radius (the chapter landmarks, deep in the flight) whenever it drew first.
+      depthWrite: false,
     });
     const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(600, 32, 32), atmosphereMaterial);
     scene.add(atmosphere);
+
+    // One landmark per chapter (src/cosmos/landmarks.ts), placed relative to that chapter's
+    // camera waypoint and faded with its text.
+    const landmarks = SCENES.flatMap((chapter, index) => {
+      const create = LANDMARKS[chapter.id];
+      if (!create) return [];
+      const landmark = create(chapter, getHue(chapter.id), { pixelRatio });
+      landmark.object.visible = false;
+      scene.add(landmark.object);
+      return [{ index, chapter, landmark, waypoint: CAMERA_PATH[chapter.id] ?? DEFAULT_CAM }];
+    });
+    const landmarkXScale = () =>
+      Math.min(1.8, Math.max(0.6, camera.aspect / LANDMARK_REF_ASPECT));
 
     const resize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -325,6 +387,25 @@ function setupScene(canvas: HTMLCanvasElement): () => void {
     window.addEventListener("resize", resize);
 
     const smooth = { x: DEFAULT_CAM[0], y: DEFAULT_CAM[1], z: DEFAULT_CAM[2] };
+
+    // Frame intervals for the one-time MSAA check; null once decided (or if MSAA is off).
+    let msaaProbe: number[] | null = composer.renderTarget1.samples > 0 ? [] : null;
+    let lastFrameAt = 0;
+    const probeMsaa = (now: number) => {
+      if (!msaaProbe) return;
+      if (lastFrameAt) msaaProbe.push(now - lastFrameAt);
+      lastFrameAt = now;
+      if (msaaProbe.length < MSAA_WARMUP_FRAMES + MSAA_PROBE_FRAMES) return;
+      const settled = msaaProbe.slice(MSAA_WARMUP_FRAMES).sort((a, b) => a - b);
+      if (settled[settled.length >> 1] > MSAA_MAX_FRAME_MS) {
+        for (const target of [composer.renderTarget1, composer.renderTarget2]) {
+          // Re-created on next use, now without multisampling.
+          target.dispose();
+          target.samples = 0;
+        }
+      }
+      msaaProbe = null;
+    };
 
     let raf = 0;
     const draw = (now: number) => {
@@ -346,7 +427,11 @@ function setupScene(canvas: HTMLCanvasElement): () => void {
         smooth.y + Math.cos(time * 0.15),
         smooth.z,
       );
-      camera.lookAt(0, 10, -600);
+      camera.lookAt(
+        LOOK_TARGET[0],
+        LOOK_TARGET[1],
+        Math.min(LOOK_TARGET[2], smooth.z - MIN_LOOK_AHEAD),
+      );
 
       const hueA = getHue(SCENES[from].id);
       const hueB = getHue(SCENES[to].id);
@@ -356,6 +441,12 @@ function setupScene(canvas: HTMLCanvasElement): () => void {
       (nebulaMaterial.uniforms.color1.value as THREE.Color).setRGB(r, g, b);
       (nebulaMaterial.uniforms.color2.value as THREE.Color).setRGB(r * 0.25, g * 0.3, b * 0.45);
       (atmosphereMaterial.uniforms.tint.value as THREE.Color).setRGB(r, g, b);
+      const openSpace = THREE.MathUtils.smoothstep(
+        lastRangeZ - smooth.z,
+        OPEN_SPACE_RAMP[0],
+        OPEN_SPACE_RAMP[1],
+      );
+      atmosphereMaterial.uniforms.strength.value = 1 - openSpace * (1 - OPEN_SPACE_GLOW);
       nebulaMaterial.uniforms.time.value = time * 0.5;
       atmosphereMaterial.uniforms.time.value = time;
 
@@ -374,7 +465,32 @@ function setupScene(canvas: HTMLCanvasElement): () => void {
         mountain.material.opacity = (mountain.userData.baseOpacity as number) * fade;
       });
 
+      const xScale = landmarkXScale();
+      for (const { index, chapter, landmark, waypoint } of landmarks) {
+        // Exactly the chapter text's own opacity: landmarks share one patch of sky, so like the
+        // text they dip through empty background at each boundary instead of cross-fading
+        // into a double exposure.
+        const presence = sceneOpacity(progress, index);
+        landmark.object.visible = presence > 0.001;
+        if (!landmark.object.visible) continue;
+        const { offset, follow } = landmark.placement;
+        landmark.object.position.set(
+          offset[0] * xScale,
+          waypoint[1] + offset[1] + (smooth.y - waypoint[1]) * follow,
+          waypoint[2] + offset[2] + (smooth.z - waypoint[2]) * follow,
+        );
+        const inner = sceneInnerLocal(sceneLocalProgress(progress, chapter.id), chapter.id);
+        const steps = chapter.steps ?? 1;
+        landmark.update({
+          time,
+          presence,
+          inner,
+          step: steps > 1 ? steppedCarouselPosition(inner, steps) : 0,
+        });
+      }
+
       composer.render();
+      probeMsaa(now);
       // First frame is on screen — the loader can start its fade-out over the live scene.
       if (!timelineStore.getState().backgroundReady) {
         timelineStore.getState().setBackgroundReady(true);
@@ -382,6 +498,8 @@ function setupScene(canvas: HTMLCanvasElement): () => void {
     };
 
     const start = () => {
+      // Time spent in a hidden tab isn't a slow frame.
+      lastFrameAt = 0;
       if (!raf) raf = requestAnimationFrame(draw);
     };
     const stop = () => {
@@ -408,6 +526,7 @@ function setupScene(canvas: HTMLCanvasElement): () => void {
       nebulaMaterial.dispose();
       atmosphere.geometry.dispose();
       atmosphereMaterial.dispose();
+      for (const { landmark } of landmarks) landmark.dispose();
       composer.dispose();
       renderer.dispose();
     };
